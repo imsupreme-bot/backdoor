@@ -1,5 +1,5 @@
 {
-  "name": "c2-server",
+  "name": "backdoor-host",
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
@@ -7,5 +7,8 @@
   },
   "dependencies": {
     "express": "^4.18.2"
+  },
+  "engines": {
+    "node": ">=16.0.0"
   }
 }
